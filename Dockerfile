@@ -12,6 +12,8 @@ ENV HTTPS_PORT 8443
 ENV SHADOWSOCKS_HOST localhost
 ENV SHADOWSOCKS_PORT 8388
 
-RUN apk add sslh
+RUN apk update && \
+       apk add --update-cache --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ sslh && \
+       rm -rf /var/cache/apk/*
 
-CMD sslh -f -u root -p $LISTEN_IP:$LISTEN_PORT --ssh $SSH_HOST:$SSH_PORT --ssl $HTTPS_HOST:$HTTPS_PORT --openvpn $OPENVPN_HOST:$OPENVPN_PORT --anyport $SHADOWSOCKS_HOST:$SHADOWSOCKS_PORT
+CMD sslh -f -u root --listen $LISTEN_IP:$LISTEN_PORT --ssh $SSH_HOST:$SSH_PORT --ssl $HTTPS_HOST:$HTTPS_PORT --openvpn $OPENVPN_HOST:$OPENVPN_PORT --anyprot $SHADOWSOCKS_HOST:$SHADOWSOCKS_PORT
