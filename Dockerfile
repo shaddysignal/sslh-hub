@@ -16,4 +16,4 @@ RUN apk update && \
        apk add --update-cache --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ sslh && \
        rm -rf /var/cache/apk/*
 
-CMD sslh -f -u root --listen $LISTEN_IP:$LISTEN_PORT --ssh $SSH_HOST:$SSH_PORT --ssl $HTTPS_HOST:$HTTPS_PORT --openvpn $OPENVPN_HOST:$OPENVPN_PORT --anyprot $SHADOWSOCKS_HOST:$SHADOWSOCKS_PORT
+ENTRYPOINT ["sslh", "-f", "-u", "root", "--listen", "$LISTEN_IP:$LISTEN_PORT", "--ssh", "$SSH_HOST:$SSH_PORT", "--ssl", "$HTTPS_HOST:$HTTPS_PORT", "--openvpn", "$OPENVPN_HOST:$OPENVPN_PORT", "--anyprot", "$SHADOWSOCKS_HOST:$SHADOWSOCKS_PORT"]
