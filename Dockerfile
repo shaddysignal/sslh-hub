@@ -16,4 +16,7 @@ RUN apk update && \
        apk add --update-cache --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ sslh && \
        rm -rf /var/cache/apk/*
 
-ENTRYPOINT ["sslh", "-f", "-u", "root", "--listen", "$LISTEN_IP:$LISTEN_PORT", "--ssh", "$SSH_HOST:$SSH_PORT", "--ssl", "$HTTPS_HOST:$HTTPS_PORT", "--openvpn", "$OPENVPN_HOST:$OPENVPN_PORT", "--anyprot", "$SHADOWSOCKS_HOST:$SHADOWSOCKS_PORT"]
+ADD entry.sh /usr/local/bin/entry.sh
+RUN chmod +x /usr/local/bin/entry.sh
+
+ENTRYPOINT ["/usr/local/bin/entry.sh"]
