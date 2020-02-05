@@ -29,6 +29,8 @@ HTTPS_PORT 8443
 
 SHADOWSOCKS_HOST localhost
 SHADOWSOCKS_PORT 8388
+
+CMD_OPTS (extra command line options when running sslh, defaults to blank)
 ```
 
 ----
