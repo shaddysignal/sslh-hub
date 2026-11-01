@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  schedule:
+    # Weekly rebuild so the published image picks up Alpine security fixes.
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TEST_IMAGE: sslh-hub:test
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The linters only read the checkout, so floating tags are acceptable here.
+      - name: hadolint
+        run: docker run --rm -i hadolint/hadolint < Dockerfile
+      - name: shellcheck
+        run: docker run --rm -v "$PWD:/mnt:ro" koalaman/shellcheck:stable -s sh entry.sh tests/smoke.sh
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo:ro" -w /repo rhysd/actionlint:latest -color
+
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    outputs:
+      sslh_version: ${{ steps.version.outputs.sslh_version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build for the local daemon
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          load: true
+          tags: ${{ env.TEST_IMAGE }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Record the sslh version
+        id: version
+        run: |
+          v=$(docker run --rm --entrypoint sslh-select "$TEST_IMAGE" -V | awk 'NR == 1 { print $2 }')
+          test -n "$v"
+          echo "sslh_version=$v" >> "$GITHUB_OUTPUT"
+          echo "sslh $v"
+      - name: Smoke test
+        run: tests/smoke.sh "$TEST_IMAGE"
+      - name: Vulnerability scan
+        run: |
+          docker save "$TEST_IMAGE" -o /tmp/image.tar
+          docker run --rm -v /tmp/image.tar:/image.tar:ro aquasec/trivy:latest image \
+            --input /image.tar --scanners vuln --severity HIGH,CRITICAL \
+            --ignore-unfixed --exit-code 1 --no-progress
+
+  publish:
+    name: Publish
+    needs: [lint, test]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # Docker Hub publishing is optional: it is skipped when the secret is absent.
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_REPOSITORY: ${{ vars.DOCKERHUB_REPOSITORY || 'shaddysignal/sslh-hub' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}
+            name=docker.io/${{ env.DOCKERHUB_REPOSITORY }},enable=${{ env.DOCKERHUB_USERNAME != '' }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=${{ needs.test.outputs.sslh_version }}
+            type=raw,value=${{ needs.test.outputs.sslh_version }}-{{date 'YYYYMMDD'}}
+      - name: Build and push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha

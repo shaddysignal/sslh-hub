@@ -1,0 +1,40 @@
+# sslh in front of other containers on a shared Compose network.
+# Only sslh publishes a port; the backends stay reachable by service name.
+#
+#   docker compose -f examples/compose.yaml up -d
+#
+# Replace the two backend services with your own.
+services:
+  sslh:
+    image: shaddysignal/sslh-hub:latest
+    ports:
+      - "443:443"
+    environment:
+      SSH_HOST: ssh
+      SSH_PORT: "2222"
+      HTTPS_HOST: web
+      HTTPS_PORT: "443"
+      OPENVPN_HOST: ""          # an empty host disables that protocol
+      DEFAULT_HOST: web         # catch-all for anything not recognised
+      DEFAULT_PORT: "443"
+      # SSLH_LOG_CONNECTIONS: "0"   # stop logging client addresses
+    # Hardening: sslh binds 443 as root, then drops to `nobody`.
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE, SETUID, SETGID]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    depends_on: [ssh, web]
+
+  # Example backends. Any image works; sslh just forwards TCP.
+  ssh:
+    image: lscr.io/linuxserver/openssh-server:latest
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      PUBLIC_KEY: "ssh-ed25519 AAAA... you@example"
+    restart: unless-stopped
+
+  web:
+    image: caddy:2-alpine
+    restart: unless-stopped
