@@ -181,7 +181,9 @@ tests/smoke.sh sslh-hub:test
 The smoke test starts throw-away backends on a private network and checks
 protocol routing, the configuration-file mode, both hardened run modes and
 clean shutdown. CI runs hadolint, shellcheck, actionlint, the smoke test and a
-Trivy scan before publishing.
+Trivy scan before publishing. After a publish it copies this README to the
+Docker Hub overview, which needs an access token with read, write and delete
+scope.
 
 ## Upgrading from the 2018 image
 
