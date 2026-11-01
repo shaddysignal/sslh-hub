@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # Base image in the Dockerfile (e.g. alpine 3.24 -> 3.25).
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+  # SHA-pinned actions in .github/workflows.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

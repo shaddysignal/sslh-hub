@@ -1,0 +1,3 @@
+# Only the entrypoint is needed in the build context.
+*
+!entry.sh

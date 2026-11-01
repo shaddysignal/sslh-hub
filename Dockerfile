@@ -1,23 +1,19 @@
-FROM alpine:3.6
-MAINTAINER Anon <someone@shaddy.space>
+# syntax=docker/dockerfile:1
+FROM alpine:3.24
 
-ENV LISTEN_IP 0.0.0.0
-ENV LISTEN_PORT 443
-ENV SSH_HOST localhost
-ENV SSH_PORT 22
-ENV OPENVPN_HOST localhost
-ENV OPENVPN_PORT 1194
-ENV HTTPS_HOST localhost
-ENV HTTPS_PORT 8443
-ENV SHADOWSOCKS_HOST localhost
-ENV SHADOWSOCKS_PORT 8388
-ENV CMD_OPTS
+# sslh ships in Alpine's community repository. The release branch keeps one
+# major.minor of sslh and only receives security rebuilds, so the package is
+# deliberately not pinned to an -rN revision: a pinned revision disappears from
+# the mirrors as soon as Alpine rebuilds it, which would break scheduled builds.
+# hadolint ignore=DL3018
+RUN apk add --no-cache sslh
 
-RUN apk update && \
-       apk add --update-cache --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ sslh && \
-       rm -rf /var/cache/apk/*
+COPY --chmod=755 entry.sh /usr/local/bin/entry.sh
 
-ADD entry.sh /usr/local/bin/entry.sh
-RUN chmod +x /usr/local/bin/entry.sh
+LABEL org.opencontainers.image.title="sslh-hub" \
+      org.opencontainers.image.description="sslh protocol multiplexer on Alpine Linux: SSH, TLS, OpenVPN, HTTP and more behind one port" \
+      org.opencontainers.image.source="https://github.com/shaddysignal/sslh-hub" \
+      org.opencontainers.image.licenses="Unlicense"
 
+EXPOSE 443
 ENTRYPOINT ["/usr/local/bin/entry.sh"]
